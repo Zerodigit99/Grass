@@ -112,17 +112,39 @@ async def main():
     ]
 
     print_info_box(social_media_usernames)
+    
     with open('credits.txt', 'r') as file:
-            credit = file.read()
-    if '|' in credit :
-        email , password = credit.split('|') 
+        credit = file.read()
+
+    if '|' in credit:
+        email, password = credit.split('|')
     else:
         email = input("\nEnter your Grass Email : ")
         password = input("Enter your Grass Password : ")
-    data = {"username":email,"password":password}
+
+    data = {"username": email, "password": password}
     response = requests.post('https://api.getgrass.io/login', json=data)
-    _user_id  = (response.json()['result']['data']['userId'])
-    await connect_to_wss(_user_id)
+    
+    # Check the HTTP status code
+    if response.status_code != 200:
+        logger.error(f"Failed to login. Status Code: {response.status_code}, Response: {response.text}")
+        return
+    
+    # Try to parse the response and extract user_id
+    try:
+        response_json = response.json()
+        logger.debug(f"Response JSON: {response_json}")
+        _user_id = response_json.get('result', {}).get('data', {}).get('userId')
+        
+        if _user_id:
+            logger.info(f"Successfully retrieved user ID: {_user_id}")
+            await connect_to_wss(_user_id)
+        else:
+            logger.error(f"Unexpected response format: {response_json}")
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON. Response: {response.text}, Error: {e}")
+    except KeyError as e:
+        logger.error(f"Key error while accessing response data: {e}")
 
 if __name__ == '__main__':
     asyncio.run(main())
